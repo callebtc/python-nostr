@@ -27,7 +27,7 @@ async def dm():
             f"\nFrom {event.public_key[:3]}..{event.public_key[-3:]}: {decrypted_content}"
         )
 
-    client = NostrClient(private_key=pk)
+    client = NostrClient(privatekey_hex=pk)
     if not pk:
         print(f"Your private key: {client.private_key.bech32()}")
 
@@ -66,7 +66,7 @@ async def post():
             f"\nFrom {event.public_key[:3]}..{event.public_key[-3:]}: {event.content}"
         )
 
-    sender_client = NostrClient(private_key=pk)
+    sender_client = NostrClient(privatekey_hex=pk)
     # await asyncio.sleep(1)
 
     pubkey_to_str = (

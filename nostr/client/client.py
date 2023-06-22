@@ -1,19 +1,15 @@
-from typing import *
-import ssl
-import time
+import base64
 import json
 import os
-import base64
+import ssl
+import time
+from typing import *
 
-from ..event import Event
-from ..relay_manager import RelayManager
-from ..message_type import ClientMessageType
-from ..key import PrivateKey, PublicKey
-
+from ..event import EncryptedDirectMessage, Event, EventKind
 from ..filter import Filter, Filters
-from ..event import Event, EventKind, EncryptedDirectMessage
-from ..relay_manager import RelayManager
+from ..key import PrivateKey, PublicKey
 from ..message_type import ClientMessageType
+from ..relay_manager import RelayManager
 
 # from aes import AESCipher
 from . import cbc
@@ -21,24 +17,17 @@ from . import cbc
 
 class NostrClient:
     relays = [
-        # "wss://eagerporpoise9.lnbits.com/nostrclient/api/v1/relay",
-        "wss://localhost:5001/nostrclient/api/v1/relay",
-        # "wss://nostr-pub.wellorder.net",
-        # "wss://relay.damus.io",
-        # "wss://nostr.zebedee.cloud",
-        # "wss://relay.snort.social",
-        # "wss://nostr.fmt.wiz.biz",
-        # "wss://nos.lol",
-        # "wss://nostr.oxtr.dev",
-        # "wss://relay.current.fyi",
-        # "wss://relay.snort.social",
+        "wss://nostr-pub.wellorder.net",
+        "wss://nostr.zebedee.cloud",
+        "wss://nodestr.fmt.wiz.biz",
+        "wss://nostr.oxtr.dev",
     ]  # ["wss://nostr.oxtr.dev"]  # ["wss://relay.nostr.info"] "wss://nostr-pub.wellorder.net"  "ws://91.237.88.218:2700", "wss://nostrrr.bublina.eu.org", ""wss://nostr-relay.freeberty.net"", , "wss://nostr.oxtr.dev", "wss://relay.nostr.info", "wss://nostr-pub.wellorder.net" , "wss://relayer.fiatjaf.com", "wss://nodestr.fmt.wiz.biz/", "wss://no.str.cr"
     relay_manager = RelayManager()
     private_key: PrivateKey
     public_key: PublicKey
 
-    def __init__(self, private_key: str = "", relays: List[str] = [], connect=True):
-        self.generate_keys(private_key)
+    def __init__(self, privatekey_hex: str = "", relays: List[str] = [], connect=True):
+        self.generate_keys(privatekey_hex)
 
         if len(relays):
             self.relays = relays
@@ -55,13 +44,9 @@ class NostrClient:
     def close(self):
         self.relay_manager.close_connections()
 
-    def generate_keys(self, private_key: str = None):
-        if private_key.startswith("nsec"):
-            self.private_key = PrivateKey.from_nsec(private_key)
-        elif private_key:
-            self.private_key = PrivateKey(bytes.fromhex(private_key))
-        else:
-            self.private_key = PrivateKey()  # generate random key
+    def generate_keys(self, privatekey_hex: str = None):
+        pk = bytes.fromhex(privatekey_hex) if privatekey_hex else None
+        self.private_key = PrivateKey(pk)
         self.public_key = self.private_key.public_key
 
     def post(self, message: str):
@@ -87,7 +72,6 @@ class NostrClient:
         request = [ClientMessageType.REQUEST, subscription_id]
         request.extend(filters.to_json_array())
         message = json.dumps(request)
-        # print(message)
         self.relay_manager.publish_message(message)
 
         while True:
@@ -102,16 +86,14 @@ class NostrClient:
             recipient_pubkey=to_pubkey.hex(), cleartext_content=message
         )
         self.private_key.sign_event(dm)
-        # print(dm)
         self.relay_manager.publish_event(dm)
 
-    def get_dm(self, sender_publickey: PublicKey, callback_func=None, filter_kwargs={}):
+    def get_dm(self, sender_publickey: PublicKey, callback_func=None):
         filters = Filters(
             [
                 Filter(
                     kinds=[EventKind.ENCRYPTED_DIRECT_MESSAGE],
                     pubkey_refs=[sender_publickey.hex()],
-                    **filter_kwargs,
                 )
             ]
         )
@@ -122,7 +104,7 @@ class NostrClient:
         request.extend(filters.to_json_array())
         message = json.dumps(request)
         self.relay_manager.publish_message(message)
-        # print(message)
+
         while True:
             while self.relay_manager.message_pool.has_events():
                 event_msg = self.relay_manager.message_pool.get_event()
@@ -152,11 +134,10 @@ class NostrClient:
         while True:
             while self.relay_manager.message_pool.has_events():
                 event_msg = self.relay_manager.message_pool.get_event()
-                print(event_msg.event.content)
                 if callback_events_func:
                     callback_events_func(event_msg)
             while self.relay_manager.message_pool.has_notices():
-                event_msg = self.relay_manager.message_pool.has_notices()
+                event_msg = self.relay_manager.message_pool.get_notice()
                 if callback_notices_func:
                     callback_notices_func(event_msg)
             while self.relay_manager.message_pool.has_eose_notices():
