@@ -100,7 +100,7 @@ class Relay:
 
     def close_subscription(self, id: str) -> None:
         with self.lock:
-            self.subscriptions.pop(id)
+            self.subscriptions.pop(id, None)
 
     def update_subscription(self, id: str, filters: Filters) -> None:
         with self.lock:
